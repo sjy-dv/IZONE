@@ -31,12 +31,12 @@ type archive struct {
 	Status string
 }
 
-type podChannel struct {
-	mu       sync.Mutex
-	channels []*Pod
+type podGroup struct {
+	mu     sync.Mutex
+	groups []*Pod
 }
 
-var pods *podChannel
+var pods *podGroup
 
 func RegisterPods(pod *Pod) {
 	if err := pod.exists(); err != nil {
@@ -50,16 +50,13 @@ func RegisterPods(pod *Pod) {
 		pods.mu.Lock()
 		defer pods.mu.Unlock()
 		pod.timerstart()
-		pods.channels = append(pods.channels, pod)
+		pods.groups = append(pods.groups, pod)
 	}
 }
 
 func (p *Pod) exists() error {
 	_, err := k8sclient.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Label, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (p *Pod) timerstart() {
@@ -80,9 +77,9 @@ func (p *Pod) release() {
 	p.timer.Stop()
 	pods.mu.Lock()
 	defer pods.mu.Unlock()
-	for index, pod := range pods.channels {
+	for index, pod := range pods.groups {
 		if p == pod {
-			pods.channels = append(pods.channels[:index], pods.channels[index+1:]...)
+			pods.groups = append(pods.groups[:index], pods.groups[index+1:]...)
 		}
 	}
 }

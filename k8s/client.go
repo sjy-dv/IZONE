@@ -18,9 +18,8 @@ var warnCh = make(chan string)
 var errCh = make(chan error)
 
 func ConfigK8s(os string) error {
+	loadGroups()
 	var k8sCfg *rest.Config
-	pods = &podChannel{}
-	pods.channels = make([]*Pod, 0)
 	if os == "windows" {
 		var kubeconfig string
 		if home := homedir.HomeDir(); home != "" {
@@ -64,6 +63,13 @@ func monitoring() {
 			log.Warn(warn)
 		}
 	}
+}
+
+func loadGroups() {
+	pods = &podGroup{}
+	pods.groups = make([]*Pod, 0)
+	deployments = &deploymentGroup{}
+	deployments.groups = make([]*Deployment, 0)
 }
 
 const (
