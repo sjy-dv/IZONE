@@ -87,3 +87,7 @@ const (
 const (
 	MB int64 = 1024 * 1024 * 1024
 )
+
+const (
+	abnormallyPods string = "Pod is abnormally"
+)

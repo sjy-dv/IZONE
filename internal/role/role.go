@@ -38,6 +38,31 @@ func SetRole(items map[string]loader.KslackConfig) error {
 				Interval:         time.Duration(time.Second * time.Duration(watchConfig.Interval)),
 			})
 		}
+		if watchConfig.Type == Deployment {
+			ensureRole(watchName, &watchConfig)
+			k8s.RegisterDeployments(&k8s.Deployment{
+				Label:        watchConfig.Label,
+				Namespace:    watchConfig.Namespace,
+				Logging:      watchConfig.Logging,
+				LoggingLevel: watchConfig.LoggingLevel,
+				ScaleUp: func() bool {
+					if watchConfig.ScaleOut {
+						return false
+					}
+					return watchConfig.ScaleUp
+				}(),
+				ScaleOut:                    watchConfig.ScaleOut,
+				LimitMemoryUsage:            watchConfig.LimitMemoryUsage,
+				LimitCpuUsage:               watchConfig.LimitCpuUsage,
+				Interval:                    time.Duration(watchConfig.Interval) * time.Second,
+				ScaleDownInterval:           watchConfig.ScaleDownInterval,
+				MinReplicas:                 watchConfig.MinReplicas,
+				MaxReplicas:                 watchConfig.MaxReplicas,
+				MaxMemoryPercentBeforeScale: watchConfig.MaxMemoryPercentBeforeScale,
+				MaxCpuPercentBeforeScale:    watchConfig.MaxCpuPercentBeforeScale,
+				SlackUrl:                    watchConfig.SlackUrl,
+			})
+		}
 	}
 	return nil
 }
@@ -53,6 +78,15 @@ func ensureRole(label string, cfg *loader.KslackConfig) {
 		}
 		break
 	case Deployment:
+		if cfg.ScaleOut && cfg.ScaleUp {
+			log.Warnf("deployment %s. The options for scale up and scale out cannot be selected simultaneously. The option will automatically change to prioritize scale out.", label)
+		}
+		if cfg.MinReplicas < 1 {
+			log.Warnf("deployment %s. The minimum number of replicas cannot be less than 1. It will be automatically set to 1.", label)
+		}
+		if cfg.MaxReplicas > 9 {
+			log.Warnf("deployment %s. The maximum number of replicas cannot be more than 9. It will be automatically set to 9.", label)
+		}
 		break
 	case StatefulSet:
 		break

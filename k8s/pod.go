@@ -43,8 +43,9 @@ func RegisterPods(pod *Pod) {
 		if err != nil {
 			if errors.IsNotFound(err) {
 				warnCh <- fmt.Sprintf("The Pod you registered, %s, does not exist. Please double-check the namespace and name.", pod.Label)
+			} else {
+				errCh <- err
 			}
-			errCh <- err
 		}
 	} else if err == nil {
 		pods.mu.Lock()
@@ -95,15 +96,15 @@ func (p *Pod) inspection() error {
 		slack.Channel <- &slack.KSlackForm{
 			Text: func() string {
 				if p.archive.Status == "" {
-					return fmt.Sprintf("The Status of the Pod `%s` is %s", p.Label, phase)
+					return fmt.Sprintf("Pod: %s \nThe Status of the Pod `%s` is %s", p.Label, p.Label, phase)
 				}
-				return fmt.Sprintf("The status change %s -> %s.\nThe Pod `%s` status is not normal.\nPlease check.",
-					p.archive.Status, phase, p.Label)
+				return fmt.Sprintf("Pod: %s \nThe status change %s -> %s.\nThe Pod `%s` status is not normal.\nPlease check.",
+					p.Label, p.archive.Status, phase, p.Label)
 			}(),
 			Level:      slack.ERROR,
 			WebHookUrl: p.SlackUrl,
 		}
-		return createError.New("Pod is abnormally")
+		return createError.New(abnormallyPods)
 	}
 	if p.LoggingLevel == 3 {
 		p.archive.Status = phase
@@ -113,7 +114,7 @@ func (p *Pod) inspection() error {
 	var curMem int64
 	metrics, err := metricsclient.MetricsV1beta1().PodMetricses(p.Namespace).Get(context.TODO(), p.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("The %s pod has failed the check metrics: %v", p.Label, err)
+		errCh <- fmt.Errorf("Pod: %s \nThe %s pod has failed the check metrics: %v", p.Label, p.Label, err)
 		return err
 	}
 	for _, container := range metrics.Containers {
@@ -128,8 +129,8 @@ func (p *Pod) inspection() error {
 			return nil
 		} else {
 			slack.Channel <- &slack.KSlackForm{
-				Text: fmt.Sprintf("Status: %s (%s)\nCPU Usage: %dm -> %dm (%s)\nMemory Usage: %dm -> %dm (%s)",
-					phase, phaseEqual(phase, p.archive.Status), p.archive.CPU, curCpu, percentage(curCpu, p.archive.CPU),
+				Text: fmt.Sprintf("Pod: %s \nStatus: %s (%s)\nCpu Usage: %dm -> %dm (%s)\nMemory Usage: %dm -> %dm (%s)",
+					p.Label, phase, phaseEqual(phase, p.archive.Status), p.archive.CPU, curCpu, percentage(curCpu, p.archive.CPU),
 					p.archive.Memory, curMem, percentage(curMem, p.archive.Memory)),
 				Level:      slack.INFO,
 				WebHookUrl: p.SlackUrl,
@@ -143,7 +144,7 @@ func (p *Pod) inspection() error {
 	// logging_level 1
 	if p.archive.Status == "" {
 		slack.Channel <- &slack.KSlackForm{
-			Text:       fmt.Sprintf("Status: %s\nCPU Usage: %dm\nMemory Usage: %dm", phase, curCpu, curMem),
+			Text:       fmt.Sprintf("Pod: %s \nStatus: %s\nCpu Usage: %dm\nMemory Usage: %dm", p.Label, phase, curCpu, curMem),
 			Level:      slack.INFO,
 			WebHookUrl: p.SlackUrl,
 		}
@@ -153,8 +154,8 @@ func (p *Pod) inspection() error {
 		return nil
 	}
 	slack.Channel <- &slack.KSlackForm{
-		Text: fmt.Sprintf("Status: %s (%s)\nCPU Usage: %dm -> %dm (%s)\nMemory Usage: %dm -> %dm (%s)",
-			phase, phaseEqual(phase, p.archive.Status), p.archive.CPU, curCpu, percentage(curCpu, p.archive.CPU),
+		Text: fmt.Sprintf("Pod: %s \nStatus: %s (%s)\nCpu Usage: %dm -> %dm (%s)\nMemory Usage: %dm -> %dm (%s)",
+			p.Label, phase, phaseEqual(phase, p.archive.Status), p.archive.CPU, curCpu, percentage(curCpu, p.archive.CPU),
 			p.archive.Memory, curMem, percentage(curMem, p.archive.Memory)),
 		Level:      slack.INFO,
 		WebHookUrl: p.SlackUrl,

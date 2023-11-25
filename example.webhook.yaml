@@ -8,7 +8,7 @@ busybox:
   scale_out: true
   scale_down_interval: 60
   min_replicas: 1
-  max_replicas: 10
+  max_replicas: 9
   max_memory_percent_before_scale: 60
   max_cpu_percent_before_scale: 60
   scale_up: false
@@ -25,7 +25,7 @@ lazybox:
   scale_out: true
   scale_down_interval: 60
   min_replicas: 1
-  max_replicas: 10
+  max_replicas: 9
   max_memory_percent_before_scale: 60
   max_cpu_percent_before_scale: 60
   scale_up: false
