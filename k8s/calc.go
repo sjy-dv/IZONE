@@ -13,9 +13,16 @@ func phaseEqual(cur, pre string) string {
 }
 
 func percentage(cur, pre int64) string {
-	per := ((cur - pre) / pre) * 100
-	if per < 0 {
-		return fmt.Sprintf("%f decrease", math.Abs(float64(per)))
+	// avoid error panic: runtime error: integer divide by zero
+	if cur == 0 {
+		cur = 1
 	}
-	return fmt.Sprintf("%d increase", per)
+	if pre == 0 {
+		pre = 1
+	}
+	per := ((cur - pre) / pre) * 100
+	if cur < pre {
+		return fmt.Sprintf("%f%% decrease", math.Abs(float64(per)))
+	}
+	return fmt.Sprintf("%d%% increase", per)
 }

@@ -20,15 +20,19 @@ func main() {
 		log.Errorf("failed to configure k8s client: %v", err)
 		os.Exit(1)
 	}
+	log.Info("K8S client started")
+	log.Info("K8S metrics started")
 	watchItem, err := loader.LoadEnv("./webhook.yaml")
 	if err != nil {
 		log.Errorf("ENV LOAD ERROR : ", err)
 		os.Exit(1)
 	}
+	log.Info("Successfully get item spec file")
 	if err := role.SetRole(watchItem); err != nil {
 		log.Errorf("Configuring role : %v", err)
 		os.Exit(1)
 	}
+	log.Info("The role has been successfully assigned.")
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 }

@@ -19,7 +19,8 @@ var errCh = make(chan error)
 
 func ConfigK8s(os string) error {
 	var k8sCfg *rest.Config
-
+	pods = &podChannel{}
+	pods.channels = make([]*Pod, 0)
 	if os == "windows" {
 		var kubeconfig string
 		if home := homedir.HomeDir(); home != "" {
@@ -47,10 +48,11 @@ func ConfigK8s(os string) error {
 	}
 	k8sclient = clientset
 	metricsclient = metricsclientset
+	go monitoring()
 	return nil
 }
 
-func Monitoring() {
+func monitoring() {
 
 	for {
 		select {
