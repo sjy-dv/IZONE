@@ -1,0 +1,34 @@
+busybox:
+  type: Deployment
+  label: "busybox"
+  namespace: "busybox"
+  interval: 30
+  logging: true
+  logging_level: 1
+  scale_out: true
+  scale_down_interval: 60
+  min_replicas: 1
+  max_replicas: 10
+  max_memory_percent_before_scale: 60
+  max_cpu_percent_before_scale: 60
+  scale_up: false
+  limit_memory_usage: 100
+  limit_cpu_usage: 100
+  slack_url:
+lazybox:
+  type: Deployment
+  label: "busybox"
+  namespace: "busybox"
+  interval: 30
+  logging: true
+  logging_level: 1
+  scale_out: true
+  scale_down_interval: 60
+  min_replicas: 1
+  max_replicas: 10
+  max_memory_percent_before_scale: 60
+  max_cpu_percent_before_scale: 60
+  scale_up: false
+  limit_memory_usage: 100
+  limit_cpu_usage: 100
+  slack_url:
