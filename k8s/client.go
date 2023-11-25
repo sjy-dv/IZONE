@@ -75,3 +75,7 @@ const (
 	ErrImagePull     string = "ErrImagePull"
 	Completed        string = "Completed"
 )
+
+const (
+	MB int64 = 1024 * 1024 * 1024
+)

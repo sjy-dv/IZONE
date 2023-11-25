@@ -8,10 +8,20 @@ import (
 	"github.com/sjy-dv/kslack/pkg/log"
 )
 
-func SlackLoader() {
+var Channel = make(chan *KSlackForm)
 
+func SlackLoad() {
+	go publisher()
 }
 
+func publisher() {
+	for {
+		select {
+		case c := <-Channel:
+			apiWebHook(c)
+		}
+	}
+}
 func apiWebHook(data *KSlackForm) {
 
 	b, err := json.Marshal(kslackmsgform(data))
