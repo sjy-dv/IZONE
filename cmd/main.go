@@ -26,8 +26,11 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	channel.On()
 	slack.SlackLoad()
-	hub.Config()
-	err := k8s.ConfigK8s("windows")
+	err := hub.Config()
+	if err != nil {
+		log.Warnf("vdb config error: %v", err)
+	}
+	err = k8s.ConfigK8s("windows")
 	if err != nil {
 		log.Errorf("failed to configure k8s client: %v", err)
 		os.Exit(1)

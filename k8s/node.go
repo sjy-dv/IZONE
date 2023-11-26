@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sjy-dv/IZONE/internal/channel"
 	"github.com/sjy-dv/IZONE/pkg/slack"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
