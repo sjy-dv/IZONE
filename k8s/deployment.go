@@ -82,7 +82,7 @@ func RegisterDeployments(deployment *Deployment) {
 		errCh <- err
 		return
 	}
-	deploy, err := deployment.addreplicas(apps)
+	deploy, err := deployment.joinreplicas(apps)
 	if err != nil {
 		errCh <- err
 		return
@@ -98,7 +98,7 @@ func (d *Deployment) exists() (*appsv1.Deployment, error) {
 	return deployment, err
 }
 
-func (d *Deployment) addreplicas(deployment *appsv1.Deployment) (*Deployment, error) {
+func (d *Deployment) joinreplicas(deployment *appsv1.Deployment) (*Deployment, error) {
 	labelSelector := metav1.FormatLabelSelector(deployment.Spec.Selector)
 	replicas, err := k8sclient.CoreV1().Pods(d.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -159,7 +159,7 @@ func (d *Deployment) refresh() {
 	if err != nil {
 		return
 	}
-	rd, err := d.addreplicas(deployment)
+	rd, err := d.joinreplicas(deployment)
 	if err != nil {
 		return
 	}
