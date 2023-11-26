@@ -50,6 +50,13 @@ type darchive struct {
 	CPU     int64
 	Memory  int64
 	Replica int
+	Mediate Mediate
+}
+
+type Mediate time.Time
+
+func (m Mediate) cycle(term int) bool {
+	return time.Since(time.Time(m)).Seconds() >= float64(term)
 }
 
 type deploymentGroup struct {
@@ -107,12 +114,44 @@ func (d *Deployment) timestart() {
 		for {
 			select {
 			case <-d.timer.C:
-				if err := d.inspection(); err != nil {
-					d.release()
+				switch d.checkScaleTodo() {
+				case NORMAL:
+					if err := d.inspection(); err != nil {
+						if err.Error() == "clear" {
+							d.release()
+						}
+						d.refresh()
+					}
+					break
+				case SCALE_OUT:
+					if err := d.scaleoutinspection(); err != nil {
+						if err.Error() == "clear" {
+							d.release()
+						}
+						d.refresh()
+					}
+					break
+				case SCALE_UP:
+					break
 				}
+
 			}
 		}
 	}()
+}
+
+func (d *Deployment) refresh() {
+	deployments.mu.Lock()
+	defer deployments.mu.Unlock()
+	deployment, err := k8sclient.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Label, metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+	rd, err := d.addreplicas(deployment)
+	if err != nil {
+		return
+	}
+	d.replicas = rd.replicas
 }
 
 func (d *Deployment) release() {
@@ -127,17 +166,114 @@ func (d *Deployment) release() {
 }
 
 func (d *Deployment) inspection() error {
+	_, err := d.exists()
+	if err != nil {
+		return createError.New("clear")
+	}
 	var (
 		totalCpu    int64  = 0
 		totalMemory int64  = 0
 		slackmsg    string = ""
-		adjustment  string = ""
-		changesrc   bool   = false
-		cr          int    = 0
 	)
 	d.archive.Replica = len(d.replicas)
-	cpuoverflow := 0
-	memoverflow := 0
+	d.errCh = make(chan derror)
+	for _, replica := range d.replicas {
+		if err := replica.replicaInspection(d.Namespace, d.LoggingLevel); err != nil {
+			d.errCh <- derror{
+				label: replica.Label,
+				err:   err,
+			}
+		}
+		totalCpu += replica.CPU
+		totalMemory += replica.Memory
+	}
+	close(d.errCh)
+	if d.LoggingLevel == 3 {
+		for err := range d.errCh {
+			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
+		}
+		if slackmsg != "" {
+			slack.Channel <- &slack.KSlackForm{
+				Text:       fmt.Sprintf("Deployment: %s%s", d.Label, slackmsg),
+				Level:      slack.ERROR,
+				WebHookUrl: d.SlackUrl,
+			}
+		}
+		return nil
+	}
+	/*
+		add replcas, cpu, mem init 0 -> 1
+	*/
+	if totalCpu == 0 {
+		totalCpu = 1
+	}
+	if totalMemory == 0 {
+		totalMemory = 1
+	}
+	d.archive.CPU = totalCpu
+	d.archive.Memory = totalMemory
+	if d.LoggingLevel == 2 {
+		for err := range d.errCh {
+			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
+		}
+		if slackmsg != "" {
+			// error scenario
+			slack.Channel <- &slack.KSlackForm{
+				Text: fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
+					d.Label, totalCpu, totalMemory, slackmsg),
+				Level:      slack.WARNING,
+				WebHookUrl: d.SlackUrl,
+			}
+		} else {
+			// non-error
+			slack.Channel <- &slack.KSlackForm{
+				Text:       fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory),
+				Level:      slack.INFO,
+				WebHookUrl: d.SlackUrl,
+			}
+		}
+		return nil
+	}
+	for err := range d.errCh {
+		slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
+	}
+	if slackmsg != "" {
+		// error scenario
+		slack.Channel <- &slack.KSlackForm{
+			Text: fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
+				d.Label, totalCpu, totalMemory, slackmsg),
+			Level:      slack.WARNING,
+			WebHookUrl: d.SlackUrl,
+		}
+	}
+	slack.Channel <- &slack.KSlackForm{
+		Text:       fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory),
+		Level:      slack.INFO,
+		WebHookUrl: d.SlackUrl,
+	}
+	return nil
+}
+
+func (d *Deployment) scaleoutinspection() error {
+
+	deployments, err := d.exists()
+	if err != nil {
+		return createError.New("clear")
+	}
+
+	var (
+		totalCpu         int64  = 0
+		totalMemory      int64  = 0
+		slackmsg         string = ""
+		adjustment       string = ""
+		changesrc        bool   = false
+		cpuoverflow      int    = 0
+		memoverflow      int    = 0
+		preCommitReplica int    = 0
+	)
+	preCommitReplica = d.archive.Replica
+	d.archive.Replica = int(*deployments.Spec.Replicas)
+
 	d.errCh = make(chan derror)
 	for _, replica := range d.replicas {
 		if err := replica.replicaInspection(d.Namespace, d.LoggingLevel); err != nil {
@@ -171,7 +307,7 @@ func (d *Deployment) inspection() error {
 			} else if err == nil {
 				changesrc = true
 				d.archive.Replica++
-				cr = 1
+				d.archive.Mediate = Mediate(time.Now())
 			}
 		}
 	}
@@ -184,13 +320,14 @@ func (d *Deployment) inspection() error {
 	*/
 	if cpuoverflow == 0 && memoverflow == 0 {
 		if len(d.replicas) > d.MinReplicas {
-			if err := d.decreaseReplica(); err != nil {
-				errCh <- err
-				adjustment = fmt.Sprintf("Replica Decrease Failed: %v", err)
-			} else if err == nil {
-				changesrc = true
-				d.archive.Replica--
-				cr = -1
+			if d.archive.Mediate.cycle(d.ScaleDownInterval) {
+				if err := d.decreaseReplica(); err != nil {
+					errCh <- err
+					adjustment = fmt.Sprintf("Replica Decrease Failed: %v", err)
+				} else if err == nil {
+					changesrc = true
+					d.archive.Replica--
+				}
 			}
 		}
 	}
@@ -217,7 +354,10 @@ func (d *Deployment) inspection() error {
 		add replcas, cpu, mem init 0 -> 1
 	*/
 	if totalCpu == 0 {
-
+		totalCpu = 1
+	}
+	if totalMemory == 0 {
+		totalMemory = 1
 	}
 	if d.LoggingLevel == 2 {
 		for err := range d.errCh {
@@ -245,12 +385,14 @@ func (d *Deployment) inspection() error {
 					if changesrc {
 						return fmt.Sprintf(
 							"%s\n%s", base, func() string {
-								if cr == 1 {
+								if preCommitReplica < d.archive.Replica {
 									return fmt.Sprintf(
 										"increase replicas %d -> %d (over cpu replicas %d, over memory replicas %d)",
-										d.archive.Replica-1, d.archive.Replica, cpuoverflow, memoverflow)
+										preCommitReplica, d.archive.Replica, cpuoverflow, memoverflow)
+								} else if preCommitReplica > d.archive.Replica {
+									return fmt.Sprintf("decrease replicas %d -> %d", preCommitReplica, d.archive.Replica)
 								}
-								return fmt.Sprintf("decrease replicas %d -> %d", d.archive.Replica+1, d.archive.Replica)
+								return "The configuration of the replica has been changed."
 							}())
 					}
 					return base
@@ -285,12 +427,14 @@ func (d *Deployment) inspection() error {
 			if changesrc {
 				return fmt.Sprintf(
 					"%s\n%s", base, func() string {
-						if cr == 1 {
+						if preCommitReplica < d.archive.Replica {
 							return fmt.Sprintf(
 								"increase replicas %d -> %d (over cpu replicas %d, over memory replicas %d)",
 								d.archive.Replica-1, d.archive.Replica, cpuoverflow, memoverflow)
+						} else if preCommitReplica > d.archive.Replica {
+							return fmt.Sprintf("decrease replicas %d -> %d", d.archive.Replica+1, d.archive.Replica)
 						}
-						return fmt.Sprintf("decrease replicas %d -> %d", d.archive.Replica+1, d.archive.Replica)
+						return "The configuration of the replica has been changed."
 					}())
 			}
 			return base
@@ -357,4 +501,14 @@ func (d *Deployment) decreaseReplica() error {
 			Update(context.TODO(), deployment, metav1.UpdateOptions{})
 		return err
 	})
+}
+
+func (d *Deployment) checkScaleTodo() int {
+	if d.ScaleOut {
+		return SCALE_OUT
+	}
+	if d.ScaleUp {
+		return SCALE_UP
+	}
+	return NORMAL
 }

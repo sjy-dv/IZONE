@@ -91,3 +91,9 @@ const (
 const (
 	abnormallyPods string = "Pod is abnormally"
 )
+
+const (
+	NORMAL int = iota
+	SCALE_UP
+	SCALE_OUT
+)
