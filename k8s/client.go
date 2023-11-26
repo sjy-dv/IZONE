@@ -52,7 +52,6 @@ func ConfigK8s(os string) error {
 }
 
 func monitoring() {
-
 	for {
 		select {
 		case info := <-infoCh:
@@ -70,6 +69,8 @@ func loadGroups() {
 	pods.groups = make([]*Pod, 0)
 	deployments = &deploymentGroup{}
 	deployments.groups = make([]*Deployment, 0)
+	statefulsets = &statefulsetGroup{}
+	statefulsets.groups = make([]*Statefulset, 0)
 }
 
 const (

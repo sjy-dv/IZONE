@@ -3,8 +3,8 @@ module github.com/sjy-dv/IZONE
 go 1.21.0
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/kataras/pio v0.0.13
-	github.com/sjy-dv/kslack v0.0.0-20231126180527-affc4c31c800
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.28.4
 	k8s.io/apimachinery v0.28.4

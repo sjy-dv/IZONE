@@ -13,6 +13,7 @@ const (
 	Deployment       string = "Deployment"
 	StatefulSet      string = "StatefulSet"
 	PersistentVolume string = "PersistentVolume"
+	Node             string = "Node"
 )
 
 /*
@@ -86,6 +87,12 @@ func SetRole(items map[string]loader.IZONEConfig) error {
 				MaxMemoryPercentBeforeScale: watchConfig.MaxMemoryPercentBeforeScale,
 				MaxCpuPercentBeforeScale:    watchConfig.MaxCpuPercentBeforeScale,
 				SlackUrl:                    watchConfig.SlackUrl,
+			})
+		}
+		if watchConfig.Type == Node {
+			k8s.RegisterNode(&k8s.Node{
+				Interval: time.Duration(watchConfig.Interval) * time.Second,
+				SlackUrl: watchConfig.SlackUrl,
 			})
 		}
 	}

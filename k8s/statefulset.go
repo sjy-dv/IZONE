@@ -461,7 +461,7 @@ func (s *sreplica) replicaInspection(namespace string, lv int) error {
 	s.Status = phase
 	for _, container := range metrics.Containers {
 		s.CPU = container.Usage.Cpu().MilliValue()
-		s.Memory = container.Usage.Cpu().MilliValue() / MB
+		s.Memory = container.Usage.Memory().MilliValue() / MB
 	}
 	return nil
 }

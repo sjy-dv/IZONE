@@ -4,13 +4,21 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/sjy-dv/IZONE/internal/role"
 	"github.com/sjy-dv/IZONE/k8s"
 	"github.com/sjy-dv/IZONE/pkg/loader"
 	"github.com/sjy-dv/IZONE/pkg/log"
 	"github.com/sjy-dv/IZONE/pkg/slack"
 )
+
+func init() {
+	godotenv.Load()
+	os.Setenv("TZ", "UTC")
+	time.Local = time.UTC
+}
 
 func main() {
 	sigChan := make(chan os.Signal, 1)
