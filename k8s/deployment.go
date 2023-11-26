@@ -9,7 +9,9 @@ import (
 
 	"github.com/sjy-dv/kslack/pkg/slack"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
@@ -50,7 +52,11 @@ type darchive struct {
 	CPU     int64
 	Memory  int64
 	Replica int
+	//scale-out
 	Mediate Mediate
+	//scale-up
+	CpuMediate    Mediate
+	MemoryMediate Mediate
 }
 
 type Mediate time.Time
@@ -132,6 +138,12 @@ func (d *Deployment) timestart() {
 					}
 					break
 				case SCALE_UP:
+					if err := d.scaleupinspection(); err != nil {
+						if err.Error() == "clear" {
+							d.release()
+						}
+						d.refresh()
+					}
 					break
 				}
 
@@ -199,7 +211,6 @@ func (d *Deployment) inspection() error {
 				WebHookUrl: d.SlackUrl,
 			}
 		}
-		return nil
 	}
 	/*
 		add replcas, cpu, mem init 0 -> 1
@@ -232,7 +243,6 @@ func (d *Deployment) inspection() error {
 				WebHookUrl: d.SlackUrl,
 			}
 		}
-		return nil
 	}
 	for err := range d.errCh {
 		slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
@@ -245,11 +255,12 @@ func (d *Deployment) inspection() error {
 			Level:      slack.WARNING,
 			WebHookUrl: d.SlackUrl,
 		}
-	}
-	slack.Channel <- &slack.KSlackForm{
-		Text:       fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory),
-		Level:      slack.INFO,
-		WebHookUrl: d.SlackUrl,
+	} else {
+		slack.Channel <- &slack.KSlackForm{
+			Text:       fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory),
+			Level:      slack.INFO,
+			WebHookUrl: d.SlackUrl,
+		}
 	}
 	return nil
 }
@@ -348,17 +359,11 @@ func (d *Deployment) scaleoutinspection() error {
 				WebHookUrl: d.SlackUrl,
 			}
 		}
-		return nil
 	}
 	/*
 		add replcas, cpu, mem init 0 -> 1
 	*/
-	if totalCpu == 0 {
-		totalCpu = 1
-	}
-	if totalMemory == 0 {
-		totalMemory = 1
-	}
+
 	if d.LoggingLevel == 2 {
 		for err := range d.errCh {
 			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
@@ -401,7 +406,6 @@ func (d *Deployment) scaleoutinspection() error {
 				WebHookUrl: d.SlackUrl,
 			}
 		}
-		return nil
 	}
 	for err := range d.errCh {
 		slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
@@ -420,27 +424,28 @@ func (d *Deployment) scaleoutinspection() error {
 			Level:      slack.WARNING,
 			WebHookUrl: d.SlackUrl,
 		}
-	}
-	slack.Channel <- &slack.KSlackForm{
-		Text: func() string {
-			base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
-			if changesrc {
-				return fmt.Sprintf(
-					"%s\n%s", base, func() string {
-						if preCommitReplica < d.archive.Replica {
-							return fmt.Sprintf(
-								"increase replicas %d -> %d (over cpu replicas %d, over memory replicas %d)",
-								d.archive.Replica-1, d.archive.Replica, cpuoverflow, memoverflow)
-						} else if preCommitReplica > d.archive.Replica {
-							return fmt.Sprintf("decrease replicas %d -> %d", d.archive.Replica+1, d.archive.Replica)
-						}
-						return "The configuration of the replica has been changed."
-					}())
-			}
-			return base
-		}(),
-		Level:      slack.INFO,
-		WebHookUrl: d.SlackUrl,
+	} else {
+		slack.Channel <- &slack.KSlackForm{
+			Text: func() string {
+				base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
+				if changesrc {
+					return fmt.Sprintf(
+						"%s\n%s", base, func() string {
+							if preCommitReplica < d.archive.Replica {
+								return fmt.Sprintf(
+									"increase replicas %d -> %d (over cpu replicas %d, over memory replicas %d)",
+									preCommitReplica, d.archive.Replica, cpuoverflow, memoverflow)
+							} else if preCommitReplica > d.archive.Replica {
+								return fmt.Sprintf("decrease replicas %d -> %d", preCommitReplica, d.archive.Replica)
+							}
+							return "The configuration of the replica has been changed."
+						}())
+				}
+				return base
+			}(),
+			Level:      slack.INFO,
+			WebHookUrl: d.SlackUrl,
+		}
 	}
 	return nil
 }
@@ -511,4 +516,191 @@ func (d *Deployment) checkScaleTodo() int {
 		return SCALE_UP
 	}
 	return NORMAL
+}
+
+/*
+Scale-up is typically suitable for scenarios with a single Pod,
+such as a single-instance MySQL.
+When multiple replicas are declared and scale-up is performed,
+if one replica fits the scenario,
+the resource allocation for all replicas associated with the deployment automatically increases.
+*/
+func (d *Deployment) scaleupinspection() error {
+	deployments, err := d.exists()
+	if err != nil {
+		return createError.New("clear")
+	}
+	var (
+		slackmsg    string = ""
+		changesrc   bool   = false
+		adjustment  string = ""
+		curCpu      int64  = 0
+		curMemory   int64  = 0
+		totalCpu    int64  = 0
+		totalMemory int64  = 0
+	)
+	d.errCh = make(chan derror)
+	for _, replica := range d.replicas {
+		if err := replica.replicaInspection(d.Namespace, d.LoggingLevel); err != nil {
+			d.errCh <- derror{
+				label: replica.Label,
+				err:   err,
+			}
+		}
+		if curCpu > replica.CPU {
+			curCpu = replica.CPU
+		}
+		if curMemory > replica.Memory {
+			curMemory = replica.Memory
+		}
+		totalCpu += replica.CPU
+		totalMemory += replica.Memory
+	}
+	rememberCpu := d.archive.CPU
+	rememberMem := d.archive.Memory
+	//If there are no requests, scale-up cannot be performed
+	// increase 20% current resouces
+	if curCpu > int64(d.LimitCpuUsage) || curMemory > int64(d.LimitMemoryUsage) {
+		// if resources nil value. init apply -f yaml. assigned empty resource
+		if deployments.Spec.Template.Spec.Containers[0].Resources.Requests == nil {
+			deployments.Spec.Template.Spec.Containers[0].Resources.Requests = v1.ResourceList{}
+		}
+		if deployments.Spec.Template.Spec.Containers[0].Resources.Limits == nil {
+			deployments.Spec.Template.Spec.Containers[0].Resources.Limits = v1.ResourceList{}
+		}
+		cpuReq, cpuLim := resource.MustParse(fmt.Sprintf("%dm", int64(float64(curCpu)*1.2))), resource.MustParse(fmt.Sprintf("%dm", int64(float64(curCpu)*1.2)))
+		memReq, memLim := resource.MustParse(fmt.Sprintf("%dMi", int64(float64(curMemory)*1.2))), resource.MustParse(fmt.Sprintf("%dMi", int64(float64(curMemory)*1.2)))
+		if curCpu > int64(d.LimitCpuUsage) {
+			//only cpu update
+			deployments.Spec.Template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpuReq
+			deployments.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = cpuLim
+			d.LimitCpuUsage = int(curCpu)
+		}
+		if curMemory > int64(d.LimitMemoryUsage) {
+			//only memory update
+			deployments.Spec.Template.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = memReq
+			deployments.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = memLim
+			d.LimitMemoryUsage = int(curMemory)
+		}
+		if curCpu > int64(d.LimitCpuUsage) && curMemory > int64(d.LimitMemoryUsage) {
+			// update all
+			deployments.Spec.Template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpuReq
+			deployments.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = cpuLim
+			deployments.Spec.Template.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = memReq
+			deployments.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = memLim
+			d.LimitCpuUsage = int(curCpu)
+			d.LimitMemoryUsage = int(curMemory)
+		}
+		if err := d.resourcesApply(deployments); err != nil {
+			errCh <- err
+			adjustment = fmt.Sprintf("Failed to redefine the resources : %v", err)
+		} else if err == nil {
+			changesrc = true
+		}
+	}
+	close(d.errCh)
+	if d.LoggingLevel == 3 {
+		for err := range d.errCh {
+			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
+		}
+		if slackmsg != "" {
+			slack.Channel <- &slack.KSlackForm{
+				Text: func() string {
+					if adjustment == "" {
+						return fmt.Sprintf("Deployment: %s%s", d.Label, slackmsg)
+					}
+					return fmt.Sprintf("Deployment: %s\n%s%s", d.Label, adjustment, slackmsg)
+				}(),
+				Level:      slack.ERROR,
+				WebHookUrl: d.SlackUrl,
+			}
+		}
+	}
+	if d.LoggingLevel == 2 {
+		for err := range d.errCh {
+			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
+		}
+		if slackmsg != "" {
+			// error scenario
+			slack.Channel <- &slack.KSlackForm{
+				Text: func() string {
+					if adjustment == "" {
+						return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
+							d.Label, totalCpu, totalMemory, slackmsg)
+					}
+					return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d\n%s%s",
+						d.Label, totalCpu, totalMemory, adjustment, slackmsg)
+				}(),
+				Level:      slack.WARNING,
+				WebHookUrl: d.SlackUrl,
+			}
+		} else {
+			slack.Channel <- &slack.KSlackForm{
+				Text: func() string {
+					base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
+					if changesrc {
+						return fmt.Sprintf(
+							"%s\n%s", base, func() string {
+								if curCpu > rememberCpu {
+									return fmt.Sprintf("Redefine Resouce Cpu: %vm (request, limit)", d.LimitCpuUsage)
+								}
+								if curMemory > rememberMem {
+									return fmt.Sprintf("Redefine Resource Memory: %vm (request, limit)", d.LimitMemoryUsage)
+								}
+								return fmt.Sprintf("Redefine Resources Group\nCpu: %vm (request, limit)\nMemory: %vm (request, limit)",
+									d.LimitCpuUsage, d.LimitMemoryUsage)
+							}())
+					}
+					return base
+				}(),
+				Level:      slack.INFO,
+				WebHookUrl: d.SlackUrl,
+			}
+		}
+	}
+	if slackmsg != "" {
+		slack.Channel <- &slack.KSlackForm{
+			Text: func() string {
+				if adjustment == "" {
+					return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
+						d.Label, totalCpu, totalMemory, slackmsg)
+				}
+				return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d\n%s%s",
+					d.Label, totalCpu, totalMemory, adjustment, slackmsg)
+			}(),
+			Level:      slack.WARNING,
+			WebHookUrl: d.SlackUrl,
+		}
+	} else {
+		slack.Channel <- &slack.KSlackForm{
+			Text: func() string {
+				base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
+				if changesrc {
+					return fmt.Sprintf(
+						"%s\n%s", base, func() string {
+							if curCpu > rememberCpu {
+								return fmt.Sprintf("Redefine Resouce Cpu: %vm (request, limit)", d.LimitCpuUsage)
+							}
+							if curMemory > rememberMem {
+								return fmt.Sprintf("Redefine Resource Memory: %vm (request, limit)", d.LimitMemoryUsage)
+							}
+							return fmt.Sprintf("Redefine Resources Group\nCpu: %vm (request, limit)\nMemory: %vm (request, limit)",
+								d.LimitCpuUsage, d.LimitMemoryUsage)
+						}())
+				}
+				return base
+			}(),
+			Level:      slack.INFO,
+			WebHookUrl: d.SlackUrl,
+		}
+	}
+	return nil
+}
+
+func (d *Deployment) resourcesApply(apply *appsv1.Deployment) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err := k8sclient.AppsV1().Deployments(d.Namespace).
+			Update(context.TODO(), apply, metav1.UpdateOptions{})
+		return err
+	})
 }
