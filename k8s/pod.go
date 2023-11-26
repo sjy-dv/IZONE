@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sjy-dv/kslack/pkg/slack"
+	"github.com/sjy-dv/IZONE/pkg/slack"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -93,7 +93,7 @@ func (p *Pod) inspection() error {
 	}
 	phase := string(pod.Status.Phase)
 	if phase != "Running" && phase != "Completed" && phase != "Succeeded" {
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text: func() string {
 				if p.archive.Status == "" {
 					return fmt.Sprintf("Pod: %s \nThe Status of the Pod `%s` is %s", p.Label, p.Label, phase)
@@ -128,7 +128,7 @@ func (p *Pod) inspection() error {
 			p.archive.Memory = curMem
 			return nil
 		} else {
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: fmt.Sprintf("Pod: %s \nStatus: %s (%s)\nCpu Usage: %dm -> %dm (%s)\nMemory Usage: %dm -> %dm (%s)",
 					p.Label, phase, phaseEqual(phase, p.archive.Status), p.archive.CPU, curCpu, percentage(curCpu, p.archive.CPU),
 					p.archive.Memory, curMem, percentage(curMem, p.archive.Memory)),
@@ -143,7 +143,7 @@ func (p *Pod) inspection() error {
 	}
 	// logging_level 1
 	if p.archive.Status == "" {
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text:       fmt.Sprintf("Pod: %s \nStatus: %s\nCpu Usage: %dm\nMemory Usage: %dm", p.Label, phase, curCpu, curMem),
 			Level:      slack.INFO,
 			WebHookUrl: p.SlackUrl,
@@ -153,7 +153,7 @@ func (p *Pod) inspection() error {
 		p.archive.Memory = curMem
 		return nil
 	}
-	slack.Channel <- &slack.KSlackForm{
+	slack.Channel <- &slack.IZONEForm{
 		Text: fmt.Sprintf("Pod: %s \nStatus: %s (%s)\nCpu Usage: %dm -> %dm (%s)\nMemory Usage: %dm -> %dm (%s)",
 			p.Label, phase, phaseEqual(phase, p.archive.Status), p.archive.CPU, curCpu, percentage(curCpu, p.archive.CPU),
 			p.archive.Memory, curMem, percentage(curMem, p.archive.Memory)),

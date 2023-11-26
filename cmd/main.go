@@ -5,11 +5,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sjy-dv/kslack/internal/role"
-	"github.com/sjy-dv/kslack/k8s"
-	"github.com/sjy-dv/kslack/pkg/loader"
-	"github.com/sjy-dv/kslack/pkg/log"
-	"github.com/sjy-dv/kslack/pkg/slack"
+	"github.com/sjy-dv/IZONE/internal/role"
+	"github.com/sjy-dv/IZONE/k8s"
+	"github.com/sjy-dv/IZONE/pkg/loader"
+	"github.com/sjy-dv/IZONE/pkg/log"
+	"github.com/sjy-dv/IZONE/pkg/slack"
 )
 
 func main() {

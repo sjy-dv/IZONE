@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/sjy-dv/kslack/pkg/log"
+	"github.com/sjy-dv/IZONE/pkg/log"
 )
 
-var Channel = make(chan *KSlackForm)
+var Channel = make(chan *IZONEForm)
 
 func SlackLoad() {
 	go publisher()
@@ -22,9 +22,9 @@ func publisher() {
 		}
 	}
 }
-func apiWebHook(data *KSlackForm) {
+func apiWebHook(data *IZONEForm) {
 
-	b, err := json.Marshal(kslackmsgform(data))
+	b, err := json.Marshal(IZONEmsgform(data))
 	if err != nil {
 		log.Errorf("JSON marshal error: %v", err)
 	}

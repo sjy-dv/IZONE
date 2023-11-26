@@ -3,9 +3,9 @@ package role
 import (
 	"time"
 
-	"github.com/sjy-dv/kslack/k8s"
-	"github.com/sjy-dv/kslack/pkg/loader"
-	"github.com/sjy-dv/kslack/pkg/log"
+	"github.com/sjy-dv/IZONE/k8s"
+	"github.com/sjy-dv/IZONE/pkg/loader"
+	"github.com/sjy-dv/IZONE/pkg/log"
 )
 
 const (
@@ -21,7 +21,7 @@ Logging Level
 2 <- : Only checks for increased resource usage, changes in the number of replicas, and pending errors.
 3 <- : Only checks for pending errors.
 */
-func SetRole(items map[string]loader.KslackConfig) error {
+func SetRole(items map[string]loader.IZONEConfig) error {
 
 	for watchName, watchConfig := range items {
 		if watchConfig.Type == Pod {
@@ -92,7 +92,7 @@ func SetRole(items map[string]loader.KslackConfig) error {
 	return nil
 }
 
-func ensureRole(label string, cfg *loader.KslackConfig) {
+func ensureRole(label string, cfg *loader.IZONEConfig) {
 	switch cfg.Type {
 	case Pod:
 		if cfg.ScaleOut {

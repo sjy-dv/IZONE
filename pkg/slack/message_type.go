@@ -13,7 +13,7 @@ const (
 	ERROR
 )
 
-type KSlackForm struct {
+type IZONEForm struct {
 	Text       string
 	Level      Level
 	WebHookUrl string
@@ -23,14 +23,14 @@ var notiLv = []string{"INFO", "WARNING", "ERROR"}
 
 var colorLv = []string{"#36a64f", "#FFFD700", "#FF0000"}
 
-func kslackmsgform(k *KSlackForm) map[string]interface{} {
+func IZONEmsgform(k *IZONEForm) map[string]interface{} {
 	return map[string]interface{}{
 		"attachments": []map[string]interface{}{
 			{
 				"color":  colorLv[k.Level],
-				"title":  fmt.Sprintf("KSlack Notifications - %s", notiLv[k.Level]),
+				"title":  fmt.Sprintf("IZONE Notifications - %s", notiLv[k.Level]),
 				"text":   k.Text,
-				"footer": "kslack-notify",
+				"footer": "IZONE-notify",
 				"ts":     time.Now().Unix(),
 			},
 		},

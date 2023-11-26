@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sjy-dv/kslack/pkg/slack"
+	"github.com/sjy-dv/IZONE/pkg/slack"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -205,7 +205,7 @@ func (d *Deployment) inspection() error {
 			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
 		}
 		if slackmsg != "" {
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text:       fmt.Sprintf("Deployment: %s%s", d.Label, slackmsg),
 				Level:      slack.ERROR,
 				WebHookUrl: d.SlackUrl,
@@ -229,7 +229,7 @@ func (d *Deployment) inspection() error {
 		}
 		if slackmsg != "" {
 			// error scenario
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
 					d.Label, totalCpu, totalMemory, slackmsg),
 				Level:      slack.WARNING,
@@ -237,7 +237,7 @@ func (d *Deployment) inspection() error {
 			}
 		} else {
 			// non-error
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text:       fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory),
 				Level:      slack.INFO,
 				WebHookUrl: d.SlackUrl,
@@ -249,14 +249,14 @@ func (d *Deployment) inspection() error {
 	}
 	if slackmsg != "" {
 		// error scenario
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text: fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
 				d.Label, totalCpu, totalMemory, slackmsg),
 			Level:      slack.WARNING,
 			WebHookUrl: d.SlackUrl,
 		}
 	} else {
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text:       fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory),
 			Level:      slack.INFO,
 			WebHookUrl: d.SlackUrl,
@@ -348,7 +348,7 @@ func (d *Deployment) scaleoutinspection() error {
 			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
 		}
 		if slackmsg != "" {
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: func() string {
 					if adjustment == "" {
 						return fmt.Sprintf("Deployment: %s%s", d.Label, slackmsg)
@@ -370,7 +370,7 @@ func (d *Deployment) scaleoutinspection() error {
 		}
 		if slackmsg != "" {
 			// error scenario
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: func() string {
 					if adjustment == "" {
 						return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
@@ -384,7 +384,7 @@ func (d *Deployment) scaleoutinspection() error {
 			}
 		} else {
 			// non-error
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: func() string {
 					base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
 					if changesrc {
@@ -412,7 +412,7 @@ func (d *Deployment) scaleoutinspection() error {
 	}
 	if slackmsg != "" {
 		// error scenario
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text: func() string {
 				if adjustment == "" {
 					return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
@@ -425,7 +425,7 @@ func (d *Deployment) scaleoutinspection() error {
 			WebHookUrl: d.SlackUrl,
 		}
 	} else {
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text: func() string {
 				base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
 				if changesrc {
@@ -604,7 +604,7 @@ func (d *Deployment) scaleupinspection() error {
 			slackmsg = fmt.Sprintf("%s\n[ERROR] %s is status abnormal", slackmsg, err.label)
 		}
 		if slackmsg != "" {
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: func() string {
 					if adjustment == "" {
 						return fmt.Sprintf("Deployment: %s%s", d.Label, slackmsg)
@@ -622,7 +622,7 @@ func (d *Deployment) scaleupinspection() error {
 		}
 		if slackmsg != "" {
 			// error scenario
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: func() string {
 					if adjustment == "" {
 						return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
@@ -635,7 +635,7 @@ func (d *Deployment) scaleupinspection() error {
 				WebHookUrl: d.SlackUrl,
 			}
 		} else {
-			slack.Channel <- &slack.KSlackForm{
+			slack.Channel <- &slack.IZONEForm{
 				Text: func() string {
 					base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
 					if changesrc {
@@ -659,7 +659,7 @@ func (d *Deployment) scaleupinspection() error {
 		}
 	}
 	if slackmsg != "" {
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text: func() string {
 				if adjustment == "" {
 					return fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d%s",
@@ -672,7 +672,7 @@ func (d *Deployment) scaleupinspection() error {
 			WebHookUrl: d.SlackUrl,
 		}
 	} else {
-		slack.Channel <- &slack.KSlackForm{
+		slack.Channel <- &slack.IZONEForm{
 			Text: func() string {
 				base := fmt.Sprintf("Deployment: %s\nCpu Usage: %d\nMemory Usage: %d", d.Label, totalCpu, totalMemory)
 				if changesrc {

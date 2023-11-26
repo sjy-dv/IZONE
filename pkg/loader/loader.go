@@ -6,7 +6,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type KslackConfig struct {
+type IZONEConfig struct {
 	Type                        string `yaml:"type"`
 	Label                       string `yaml:"label"`
 	Namespace                   string `yaml:"namespace"`
@@ -25,8 +25,8 @@ type KslackConfig struct {
 	SlackUrl                    string `yaml:"slack_url"`
 }
 
-func LoadEnv(f string) (map[string]KslackConfig, error) {
-	var envs map[string]KslackConfig
+func LoadEnv(f string) (map[string]IZONEConfig, error) {
+	var envs map[string]IZONEConfig
 	data, err := os.ReadFile(f)
 	if err != nil {
 		return nil, err

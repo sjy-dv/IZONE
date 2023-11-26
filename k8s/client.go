@@ -3,7 +3,7 @@ package k8s
 import (
 	"path/filepath"
 
-	"github.com/sjy-dv/kslack/pkg/log"
+	"github.com/sjy-dv/IZONE/pkg/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
