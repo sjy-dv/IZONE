@@ -3,7 +3,6 @@ package k8s
 import (
 	"path/filepath"
 
-	"github.com/sjy-dv/IZONE/pkg/log"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -13,9 +12,6 @@ import (
 
 var k8sclient *kubernetes.Clientset
 var metricsclient *metrics.Clientset
-var infoCh = make(chan string)
-var warnCh = make(chan string)
-var errCh = make(chan error)
 
 func ConfigK8s(os string) error {
 	loadGroups()
@@ -47,21 +43,7 @@ func ConfigK8s(os string) error {
 	}
 	k8sclient = clientset
 	metricsclient = metricsclientset
-	go monitoring()
 	return nil
-}
-
-func monitoring() {
-	for {
-		select {
-		case info := <-infoCh:
-			log.Info(info)
-		case err := <-errCh:
-			log.Error(err)
-		case warn := <-warnCh:
-			log.Warn(warn)
-		}
-	}
 }
 
 func loadGroups() {

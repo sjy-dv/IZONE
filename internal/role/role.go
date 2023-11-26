@@ -3,6 +3,7 @@ package role
 import (
 	"time"
 
+	"github.com/sjy-dv/IZONE/hub"
 	"github.com/sjy-dv/IZONE/k8s"
 	"github.com/sjy-dv/IZONE/pkg/loader"
 	"github.com/sjy-dv/IZONE/pkg/log"
@@ -14,6 +15,7 @@ const (
 	StatefulSet      string = "StatefulSet"
 	PersistentVolume string = "PersistentVolume"
 	Node             string = "Node"
+	MySQL            string = "MySQL"
 )
 
 /*
@@ -93,6 +95,15 @@ func SetRole(items map[string]loader.IZONEConfig) error {
 			k8s.RegisterNode(&k8s.Node{
 				Interval: time.Duration(watchConfig.Interval) * time.Second,
 				SlackUrl: watchConfig.SlackUrl,
+			})
+		}
+		if watchConfig.Type == MySQL {
+			hub.MysqlConnector(&hub.DBConnector{
+				User:     watchConfig.User,
+				Password: watchConfig.Password,
+				Host:     watchConfig.Host,
+				Port:     watchConfig.Port,
+				Label:    watchConfig.Label,
 			})
 		}
 	}

@@ -31,7 +31,7 @@ func (n *Node) watch() {
 				nodes, err := k8sclient.CoreV1().Nodes().
 					List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
-					errCh <- err
+					channel.ErrCh <- err
 					nodes = nil
 				}
 				if nodes != nil {
@@ -45,7 +45,7 @@ func (n *Node) watch() {
 				metrics, err := metricsclient.MetricsV1beta1().NodeMetricses().
 					List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
-					errCh <- err
+					channel.ErrCh <- err
 					metrics = nil
 				}
 				if metrics != nil {
@@ -63,7 +63,7 @@ func (n *Node) watch() {
 						FieldSelector: "involvedObject.kind=Node",
 					})
 				if err != nil {
-					errCh <- err
+					channel.ErrCh <- err
 					events = nil
 				}
 				if events != nil {

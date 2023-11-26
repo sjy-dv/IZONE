@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sjy-dv/IZONE/internal/channel"
 	"github.com/sjy-dv/IZONE/pkg/slack"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -63,15 +64,15 @@ func RegisterStatefulsets(statefulset *Statefulset) {
 	apps, err := statefulset.exists()
 	if err != nil {
 		if errors.IsNotFound(err) {
-			warnCh <- fmt.Sprintf("The Statefulset you registered, %s, does not exist. Please double-check the namespace and name.", statefulset.Label)
+			channel.WarnCh <- fmt.Sprintf("The Statefulset you registered, %s, does not exist. Please double-check the namespace and name.", statefulset.Label)
 			return
 		}
-		errCh <- err
+		channel.ErrCh <- err
 		return
 	}
 	sts, err := statefulset.joinreplicas(apps)
 	if err != nil {
-		errCh <- err
+		channel.ErrCh <- err
 		return
 	}
 	statefulsets.mu.Lock()
@@ -303,7 +304,7 @@ func (s *Statefulset) scaleoutinspection() error {
 		len(s.replicas) <= s.MinReplicas {
 		if len(s.replicas) < s.MaxReplicas {
 			if err := s.increaseReplica(); err != nil {
-				errCh <- err
+				channel.ErrCh <- err
 				adjustment = fmt.Sprintf("Replica Increase Failed: %v", err)
 			} else if err == nil {
 				changesrc = true
@@ -323,7 +324,7 @@ func (s *Statefulset) scaleoutinspection() error {
 		if len(s.replicas) > s.MinReplicas {
 			if s.archive.Mediate.cycle(s.ScaleDownInterval) {
 				if err := s.decreaseReplica(); err != nil {
-					errCh <- err
+					channel.ErrCh <- err
 					adjustment = fmt.Sprintf("Replica Decrease Failed: %v", err)
 				} else if err == nil {
 					changesrc = true
@@ -443,7 +444,7 @@ func (s *Statefulset) scaleoutinspection() error {
 func (s *sreplica) replicaInspection(namespace string, lv int) error {
 	pod, err := k8sclient.CoreV1().Pods(namespace).Get(context.TODO(), s.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("The %s pod has failed the check : %v", s.Label, err)
+		channel.ErrCh <- fmt.Errorf("The %s pod has failed the check : %v", s.Label, err)
 		return err
 	}
 	phase := string(pod.Status.Phase)
@@ -455,7 +456,7 @@ func (s *sreplica) replicaInspection(namespace string, lv int) error {
 	}
 	metrics, err := metricsclient.MetricsV1beta1().PodMetricses(namespace).Get(context.TODO(), s.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("The %s pod has failed the check metrics: %v", s.Label, err)
+		channel.ErrCh <- fmt.Errorf("The %s pod has failed the check metrics: %v", s.Label, err)
 		return err
 	}
 	s.Status = phase
@@ -582,7 +583,7 @@ func (s *Statefulset) scaleupinspection() error {
 			s.LimitMemoryUsage = int(curMemory)
 		}
 		if err := s.resourcesApply(statefulset); err != nil {
-			errCh <- err
+			channel.ErrCh <- err
 			adjustment = fmt.Sprintf("Failed to redefine the resources : %v", err)
 		} else if err == nil {
 			changesrc = true

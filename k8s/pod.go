@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sjy-dv/IZONE/internal/channel"
 	"github.com/sjy-dv/IZONE/pkg/slack"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,9 +43,9 @@ func RegisterPods(pod *Pod) {
 	if err := pod.exists(); err != nil {
 		if err != nil {
 			if errors.IsNotFound(err) {
-				warnCh <- fmt.Sprintf("The Pod you registered, %s, does not exist. Please double-check the namespace and name.", pod.Label)
+				channel.WarnCh <- fmt.Sprintf("The Pod you registered, %s, does not exist. Please double-check the namespace and name.", pod.Label)
 			} else {
-				errCh <- err
+				channel.ErrCh <- err
 			}
 		}
 	} else if err == nil {
@@ -88,7 +89,7 @@ func (p *Pod) release() {
 func (p *Pod) inspection() error {
 	pod, err := k8sclient.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("The %s pod has failed the check : %v", p.Label, err)
+		channel.ErrCh <- fmt.Errorf("The %s pod has failed the check : %v", p.Label, err)
 		return err
 	}
 	phase := string(pod.Status.Phase)
@@ -114,7 +115,7 @@ func (p *Pod) inspection() error {
 	var curMem int64
 	metrics, err := metricsclient.MetricsV1beta1().PodMetricses(p.Namespace).Get(context.TODO(), p.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("Pod: %s \nThe %s pod has failed the check metrics: %v", p.Label, p.Label, err)
+		channel.ErrCh <- fmt.Errorf("Pod: %s \nThe %s pod has failed the check metrics: %v", p.Label, p.Label, err)
 		return err
 	}
 	for _, container := range metrics.Containers {

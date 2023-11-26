@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sjy-dv/IZONE/internal/channel"
 	"github.com/sjy-dv/IZONE/pkg/slack"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -76,15 +77,15 @@ func RegisterDeployments(deployment *Deployment) {
 	apps, err := deployment.exists()
 	if err != nil {
 		if errors.IsNotFound(err) {
-			warnCh <- fmt.Sprintf("The Deployment you registered, %s, does not exist. Please double-check the namespace and name.", deployment.Label)
+			channel.WarnCh <- fmt.Sprintf("The Deployment you registered, %s, does not exist. Please double-check the namespace and name.", deployment.Label)
 			return
 		}
-		errCh <- err
+		channel.ErrCh <- err
 		return
 	}
 	deploy, err := deployment.joinreplicas(apps)
 	if err != nil {
-		errCh <- err
+		channel.ErrCh <- err
 		return
 	}
 	deployments.mu.Lock()
@@ -313,7 +314,7 @@ func (d *Deployment) scaleoutinspection() error {
 		len(d.replicas) <= d.MinReplicas {
 		if len(d.replicas) < d.MaxReplicas {
 			if err := d.increaseReplica(); err != nil {
-				errCh <- err
+				channel.ErrCh <- err
 				adjustment = fmt.Sprintf("Replica Increase Failed: %v", err)
 			} else if err == nil {
 				changesrc = true
@@ -333,7 +334,7 @@ func (d *Deployment) scaleoutinspection() error {
 		if len(d.replicas) > d.MinReplicas {
 			if d.archive.Mediate.cycle(d.ScaleDownInterval) {
 				if err := d.decreaseReplica(); err != nil {
-					errCh <- err
+					channel.ErrCh <- err
 					adjustment = fmt.Sprintf("Replica Decrease Failed: %v", err)
 				} else if err == nil {
 					changesrc = true
@@ -453,7 +454,7 @@ func (d *Deployment) scaleoutinspection() error {
 func (d *dreplica) replicaInspection(namespace string, lv int) error {
 	pod, err := k8sclient.CoreV1().Pods(namespace).Get(context.TODO(), d.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("The %s pod has failed the check : %v", d.Label, err)
+		channel.ErrCh <- fmt.Errorf("The %s pod has failed the check : %v", d.Label, err)
 		return err
 	}
 	phase := string(pod.Status.Phase)
@@ -465,7 +466,7 @@ func (d *dreplica) replicaInspection(namespace string, lv int) error {
 	}
 	metrics, err := metricsclient.MetricsV1beta1().PodMetricses(namespace).Get(context.TODO(), d.Label, metav1.GetOptions{})
 	if err != nil {
-		errCh <- fmt.Errorf("The %s pod has failed the check metrics: %v", d.Label, err)
+		channel.ErrCh <- fmt.Errorf("The %s pod has failed the check metrics: %v", d.Label, err)
 		return err
 	}
 	d.Status = phase
@@ -592,7 +593,7 @@ func (d *Deployment) scaleupinspection() error {
 			d.LimitMemoryUsage = int(curMemory)
 		}
 		if err := d.resourcesApply(deployments); err != nil {
-			errCh <- err
+			channel.ErrCh <- err
 			adjustment = fmt.Sprintf("Failed to redefine the resources : %v", err)
 		} else if err == nil {
 			changesrc = true

@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/sjy-dv/IZONE/internal/database"
+	"github.com/sjy-dv/IZONE/hub"
+	"github.com/sjy-dv/IZONE/internal/channel"
 	"github.com/sjy-dv/IZONE/internal/role"
 	"github.com/sjy-dv/IZONE/k8s"
 	"github.com/sjy-dv/IZONE/pkg/loader"
@@ -23,8 +24,9 @@ func init() {
 
 func main() {
 	sigChan := make(chan os.Signal, 1)
+	channel.On()
 	slack.SlackLoad()
-	database.Config()
+	hub.Config()
 	err := k8s.ConfigK8s("windows")
 	if err != nil {
 		log.Errorf("failed to configure k8s client: %v", err)
@@ -32,7 +34,7 @@ func main() {
 	}
 	log.Info("K8S client started")
 	log.Info("K8S metrics started")
-	watchItem, err := loader.LoadEnv("./webhook.yaml")
+	watchItem, err := loader.LoadEnv("./izone.yaml")
 	if err != nil {
 		log.Errorf("ENV LOAD ERROR : ", err)
 		os.Exit(1)

@@ -23,6 +23,10 @@ type IZONEConfig struct {
 	LimitMemoryUsage            int    `yaml:"limit_memory_usage"`
 	LimitCpuUsage               int    `yaml:"limit_cpu_usage"`
 	SlackUrl                    string `yaml:"slack_url"`
+	User                        string `yaml:"user"`
+	Password                    string `yaml:"password"`
+	Host                        string `yaml:"host"`
+	Port                        int    `yaml:"port"`
 }
 
 func LoadEnv(f string) (map[string]IZONEConfig, error) {

@@ -27,7 +27,7 @@ spec:
     command: ["sleep", "3600"]
 ```
 
--confg yaml(webhook.yaml)
+-confg yaml(izone.yaml)
 ```yaml
 busybox:
   type: Pod

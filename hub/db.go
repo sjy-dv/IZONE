@@ -1,4 +1,4 @@
-package database
+package hub
 
 type DBConnector struct {
 	User     string
