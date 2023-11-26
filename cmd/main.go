@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/sjy-dv/IZONE/internal/database"
 	"github.com/sjy-dv/IZONE/internal/role"
 	"github.com/sjy-dv/IZONE/k8s"
 	"github.com/sjy-dv/IZONE/pkg/loader"
@@ -23,6 +24,7 @@ func init() {
 func main() {
 	sigChan := make(chan os.Signal, 1)
 	slack.SlackLoad()
+	database.Config()
 	err := k8s.ConfigK8s("windows")
 	if err != nil {
 		log.Errorf("failed to configure k8s client: %v", err)
