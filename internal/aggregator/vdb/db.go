@@ -7,9 +7,17 @@ import (
 )
 
 type auditLog struct {
-	label   string
+	Label   string
 	log     string
 	writeAt time.Time
+}
+
+func Cast(obj interface{}) *auditLog {
+	return obj.(*auditLog)
+}
+
+func Output(log *auditLog) (time.Time, string) {
+	return log.writeAt, log.log
 }
 
 var V *memdb.MemDB
@@ -22,7 +30,7 @@ func Load() error {
 				Indexes: map[string]*memdb.IndexSchema{
 					"label": {
 						Name:    "label",
-						Unique:  true,
+						Unique:  false,
 						Indexer: &memdb.StringFieldIndex{Field: "label"},
 					},
 				},
@@ -39,7 +47,7 @@ func Load() error {
 
 func VdbColumn(label, log string) *auditLog {
 	return &auditLog{
-		label:   label,
+		Label:   label,
 		log:     label,
 		writeAt: time.Now(),
 	}

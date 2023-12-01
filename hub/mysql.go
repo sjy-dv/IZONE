@@ -74,13 +74,32 @@ func (identifier *mysqlidentifier) realtimePusher() {
 		select {
 		case mec := <-identifier.mostExecChannel:
 			if mec.fetch {
-
+				aggregator.Flush(fmt.Sprintf("mec_%s", identifier.Label))
 			} else {
-				aggregator.WriteMostExecQueriesLog(identifier.Label, mec.schemaName, mec.digestText, mec.executionCount)
+				aggregator.WriteMostExecQueriesLog(fmt.Sprintf("mec_%s", identifier.Label), identifier.Label, mec.schemaName, mec.digestText, mec.executionCount)
 			}
 		case saqc := <-identifier.slowAvgQueryChannel:
+			if saqc.fetch {
+				aggregator.Flush(fmt.Sprintf("saqc_%s", identifier.Label))
+			} else {
+				aggregator.WriteSlowAvgQueriesLog(fmt.Sprintf("saqc_%s",
+					identifier.Label), identifier.Label, saqc.schemaName,
+					saqc.digestText, saqc.avgExecutionTimeMs)
+			}
 		case waqc := <-identifier.waitAvgQueryChannel:
+			if waqc.fetch {
+				aggregator.Flush(fmt.Sprintf("waqc_%s", identifier.Label))
+			} else {
+				aggregator.WriteWaitAvgQueriesLog(fmt.Sprintf("waqc_%s", identifier.Label),
+					identifier.Label, waqc.schemaName, waqc.digestText, waqc.totalWaitTimeMs)
+			}
 		case oeqc := <-identifier.occurErrorQueryChannel:
+			if oeqc.fetch {
+				aggregator.Flush(fmt.Sprintf("oeqc_%s", identifier.Label))
+			} else {
+				aggregator.WriteOccurErrorQueriesLog(fmt.Sprintf("oeqc_%s", identifier.Label), identifier.Label,
+					oeqc.schemaName, oeqc.digestText, oeqc.errors)
+			}
 		}
 	}
 }
